@@ -1,0 +1,150 @@
+// Ver docs/04-diseno-base-datos.md (diseño original) y docs/adr/0002-recomendaciones-generadas-en-api.md
+// (recommendations vive como JSON embebido en Prediction, no como tabla separada).
+// Convención de nomenclatura: docs/11-convenciones-proyecto.md §3 (sin @map, camelCase también en la BD física).
+// La URL de conexión ya no vive aquí (Prisma 7) — ver prisma.config.ts y variable DATABASE_URL.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs" // el resto del proyecto (Nest/Jest) es CommonJS
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  roles          UserRole[]
+  teacherOf      TeacherStudent[]
+  predictions    Prediction[]
+  datasetUploads DatasetUpload[]
+  auditLogs      AuditLog[]
+}
+
+model Role {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  key         String  @unique
+  description String?
+
+  roles RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id])
+  role   Role @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model Student {
+  id              String         @id @default(uuid())
+  controlNumber   String         @unique
+  fullName        String
+  career          String
+  semester        Int
+  status          String         @default("active")
+  extraData       Json           @default("{}")
+  datasetUploadId String?
+  datasetUpload   DatasetUpload? @relation(fields: [datasetUploadId], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  teachers    TeacherStudent[]
+  predictions Prediction[]
+
+  @@index([career, semester])
+}
+
+model TeacherStudent {
+  teacherId String
+  studentId String
+  teacher   User    @relation(fields: [teacherId], references: [id])
+  student   Student @relation(fields: [studentId], references: [id])
+
+  @@id([teacherId, studentId])
+}
+
+model DatasetColumnDefinition {
+  id           String  @id @default(uuid())
+  key          String  @unique
+  label        String
+  dataType     String // "string" | "number" | "boolean" | "date"
+  required     Boolean @default(false)
+  active       Boolean @default(true)
+  displayOrder Int     @default(0)
+}
+
+model DatasetUpload {
+  id         String   @id @default(uuid())
+  fileName   String
+  uploadedBy String
+  uploader   User     @relation(fields: [uploadedBy], references: [id])
+  status     String // "processing" | "completed" | "failed"
+  totalRows  Int      @default(0)
+  errorRows  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  students Student[]
+}
+
+model Prediction {
+  id              String   @id @default(uuid())
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id])
+  executedBy      String
+  executor        User     @relation(fields: [executedBy], references: [id])
+  modelVersion    String
+  riskLevel       String // "low" | "medium" | "high"
+  score           Float
+  topFactors      Json     @default("[]")
+  recommendations Json     @default("[]") // ver ADR-0002 — sin tabla PredictionRecommendation en beta
+  createdAt       DateTime @default(now())
+
+  @@index([studentId, createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String? // null cuando la acción no corresponde a un usuario existente
+  // (p. ej. login fallido con un correo que no existe — ver AuthService)
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model SystemConfig {
+  id    String @id @default(uuid())
+  key   String @unique
+  value Json
+}

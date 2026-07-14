@@ -1,0 +1,36 @@
+# Ver docs/13-estrategia-docker.md §5. Se aplica automáticamente junto al compose
+# base en local. Su propósito es que el checkpoint de integración sea rápido de
+# repetir (hot-reload) sin reconstruir imágenes desde cero, y exponer puertos que en
+# el compose base están cerrados a propósito.
+
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  api:
+    build:
+      target: deps
+    working_dir: /repo/apps/api
+    command: sh -c "pnpm exec prisma generate && pnpm start:dev"
+    volumes:
+      - ./apps/api:/repo/apps/api
+      - /repo/apps/api/node_modules
+    environment:
+      NODE_ENV: development
+
+  web:
+    build:
+      target: deps
+    working_dir: /repo/apps/web
+    command: pnpm dev
+    volumes:
+      - ./apps/web:/repo/apps/web
+      - /repo/apps/web/node_modules
+
+  ml:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./apps/ml/app:/app/app
+    ports:
+      - "8000:8000"

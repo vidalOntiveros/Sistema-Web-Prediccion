@@ -1,0 +1,19 @@
+{
+  "name": "sistema-web-prediccion",
+  "private": true,
+  "packageManager": "pnpm@11.11.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api start:dev",
+    "dev": "concurrently -n web,api -c blue,green \"pnpm:dev:web\" \"pnpm:dev:api\"",
+    "build": "pnpm --filter web build && pnpm --filter api build",
+    "lint": "pnpm --filter web lint && pnpm --filter api lint",
+    "test": "pnpm --filter api test && pnpm --filter web test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
