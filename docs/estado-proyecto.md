@@ -6,7 +6,7 @@ Referencia: [01-requerimientos.md](01-requerimientos.md) · [03-arquitectura.md]
 
 ## 1. Fecha de referencia
 
-- Hoy: **2026-07-10**.
+- Hoy: **2026-07-18**.
 - Fecha objetivo de beta: **primera semana de agosto de 2026 (supuesto — confirmar fecha real de inicio de residencias formales)**.
 - Fecha límite institucional (v1 completo): diciembre de 2026.
 
@@ -26,7 +26,7 @@ Referencia: [01-requerimientos.md](01-requerimientos.md) · [03-arquitectura.md]
 | [12-estrategia-testing.md](12-estrategia-testing.md) | Stack de tests, pirámide por app, checklist de rutas críticas |
 | [13-estrategia-docker.md](13-estrategia-docker.md) | Dockerfiles, compose base vs. override, puertos expuestos |
 
-**Fase 1 — Setup e infraestructura:** 🟡 en progreso (2026-07-14) — todo lo que no depende de Docker está hecho; falta el checkpoint real y la primera migración contra una BD real.
+**Fase 1 — Setup e infraestructura:** ✅ completa (2026-07-15) — checkpoint de Docker y primera migración contra Postgres real verificados.
 
 ## 3. Roadmap de beta (orden de ejecución)
 
@@ -37,16 +37,19 @@ Referencia: [01-requerimientos.md](01-requerimientos.md) · [03-arquitectura.md]
 - [x] Scaffold `apps/web` (Next.js + TS + Tailwind + shadcn init)
 - [x] Scaffold `apps/ml` (FastAPI) con health check **y mock de `/predict` ya cumpliendo el contrato de [ADR-0001](adr/0001-contrato-integracion-ml.md)** (adelantado desde fase 4 original) — con 9 tests de pytest cubriendo la fórmula determinista, auth por API key y el contrato
 - [x] `docker-compose.yml` + `docker-compose.override.yml` + Dockerfiles según [13-estrategia-docker.md](13-estrategia-docker.md) — **escritos y con YAML validado, pero sin verificar con un `docker-compose up` real** (ver bloqueo abajo)
-- [ ] Checkpoint: `docker-compose up` levanta los 4 servicios y responden entre sí — **bloqueado: Docker Desktop no estaba instalado en la máquina de desarrollo: pendiente de que el usuario lo instale**
+- [x] Checkpoint: `docker-compose up` levanta los 4 servicios y responden entre sí — verificado (2026-07-15): `db`/`api`/`ml`/`web` en estado `healthy`, login + `/auth/me` probados end-to-end a través de los 4 contenedores
 - [x] Schema completo de Prisma escrito (`apps/api/prisma/schema.prisma`, con la simplificación JSONB de [ADR-0002](adr/0002-recomendaciones-generadas-en-api.md) ya aplicada) y cliente generado — se adelantó el schema completo de la Fase 2 en vez de dejar una migración vacía, porque el diseño ya estaba congelado y no había razón para hacerlo en dos pasos
-- [ ] Primera migración real contra Postgres — **bloqueada por lo mismo que el checkpoint de Docker**; `prisma generate` sí corre limpio (no requiere conexión)
+- [x] Primera migración real contra Postgres (`20260715095914_init`, 2026-07-15) + seed corrido contra la BD real
 - [x] CI básico (lint + build) — `.github/workflows/ci.yml`, verificado localmente (lint/build/test de `api` y `web`, lint/test de `ml`); el job de `docker build` corre en el runner de GitHub Actions (que sí trae Docker), no depende de esta máquina
 
 **Desviaciones registradas frente al diseño original:**
 - Prisma 7 (instalada por ser la versión vigente) cambió su forma de configurarse: la URL de conexión ya no vive en `schema.prisma`, ahora vive en `prisma.config.ts`, y `PrismaClient` requiere un *driver adapter* (`@prisma/adapter-pg`) en vez de leer `DATABASE_URL` directamente. `docs/07-diseno-modulos-nestjs.md` no preveía este detalle porque es un cambio de la herramienta, no de nuestra arquitectura — el `PrismaService` ya está escrito con el adapter.
 - Desarrollo nativo usa Python 3.11 (instalado en la máquina) en vez de 3.12 como decía `01-requerimientos.md` — la imagen Docker de `apps/ml` sí usa `python:3.12-slim` como estaba diseñado. Diferencia de bajo riesgo, no bloquea nada.
+- `apps/web` usa `zod@3.25.x` en vez de `zod@4` (la versión "actual" al momento de instalar) — `@hookform/resolvers@5.4.0` (última versión publicada) todavía no tiene los tipos de `zodResolver` compatibles con zod 4.4.x (falla el type-check, no el runtime). Se documenta como algo a revisar si `@hookform/resolvers` publica una versión que corrija el overload de tipos.
+- **Bug real corregido (2026-07-15):** `GET /health` respondía `401 Unauthorized` porque el `JwtAuthGuard` global (`APP_GUARD`) lo protegía igual que cualquier otra ruta — nadie lo notó antes porque nunca se había probado contra un healthcheck real de Docker. Se agregó `@Public()` en `AppController.getHealth` (`apps/api/src/app.controller.ts`), mismo patrón que `/auth/login`.
+- El seed de Prisma (`apps/api/prisma/seed.ts`) corre con `tsx` en vez de `ts-node` — con `moduleResolution: nodenext` (`apps/api/tsconfig.json`), el cliente de Prisma generado usa imports relativos con extensión `.js` que apuntan a archivos `.ts` fuente; `ts-node` en modo CJS no resuelve esa convención al ejecutar un script suelto (mismo tipo de problema que ya obligó a un `moduleNameMapper` en Jest), `tsx` sí. Cambio en `apps/api/prisma.config.ts` (`seed: "tsx prisma/seed.ts"`) + `tsx` como devDependency de `apps/api`.
 
-### Fase 2 — Auth + RBAC + Usuarios (~1.5 semanas) — 🟡 backend hecho, frontend pendiente (2026-07-14)
+### Fase 2 — Auth + RBAC + Usuarios (~1.5 semanas) — 🟡 falta solo pantalla de administración de usuarios (2026-07-18)
 - [x] Schema Prisma: User/Role/Permission/UserRole/RolePermission (adelantado en Fase 1) + **seed** (`prisma/seed.ts`: 19 permisos, 3 roles, matriz de `02-casos-uso.md` §4, usuario Admin inicial)
 - [x] Módulo Auth: hash argon2, login, JWT access-only ([ADR-0004](adr/0004-sesion-jwt-sin-revocacion.md)), rate limit 5/15min por IP+email (`LoginThrottlerGuard`)
 - [x] `PermissionsGuard` genérico + `@RequirePermission` + `JwtAuthGuard` global + `@Public`/`@CurrentUser`
@@ -55,7 +58,7 @@ Referencia: [01-requerimientos.md](01-requerimientos.md) · [03-arquitectura.md]
 - [x] CRUD de usuarios (Admin), sin borrado físico — solo `isActive`; incluye `reset-password` y `PATCH /:id/role`
 - [x] `RolesModule` de solo lectura (`GET /roles`, `GET /permissions`)
 - [x] Filtro global de errores (sobre único de `06-diseno-api-rest.md` §3) + `ValidationPipe` + Swagger en `/api/docs`
-- [ ] Frontend: login, contexto de auth, rutas protegidas, shell por rol
+- [x] Frontend: login, contexto de auth (`AuthContext`/`use-auth`/`useHasPermission`), rutas protegidas (`proxy.ts`, ex-`middleware.ts`), BFF (`api-client.ts` + Route Handlers), `AppShell`/layout real en `(app)/layout.tsx` — verificado end-to-end (curl y navegador) contra `apps/api` nativo + Postgres en Docker
 - [ ] Frontend: pantalla de administración de usuarios (asignar rol existente, no crear roles nuevos)
 - [x] Tests: guard de permisos (4) + flujo de login (4, con Prisma/UsersService mockeados) — 9/9 pasan
 - [ ] Tests de integración reales (`test/*.e2e-spec.ts` contra Postgres) — bloqueados por lo mismo que el checkpoint de Fase 1 (sin Docker todavía)
@@ -65,14 +68,14 @@ Referencia: [01-requerimientos.md](01-requerimientos.md) · [03-arquitectura.md]
 - `AuditLog.userId` se volvió opcional (`String?`) — un login fallido con un correo que no existe no tiene usuario al cual asociarlo, y el schema original (heredado de `04-diseno-base-datos.md`) lo exigía obligatorio.
 - Permisos embebidos en el JWT al login, tal como se decidió en `07-diseno-modulos-nestjs.md` §9 — un cambio de rol no aplica hasta que la persona vuelva a iniciar sesión.
 
-### Fase 3 — Estudiantes + Dataset (~2 semanas)
-- [x] Schema Prisma: Student/TeacherStudent/DatasetColumnDefinition/DatasetUpload (adelantado en Fase 1) — falta el **seed** de catálogo por defecto
-- [ ] CRUD de estudiantes + filtros (carrera/semestre/número de control/docente)
-- [ ] Endpoint de carga: parseo CSV/XLSX, validación contra catálogo activo, commit atómico **síncrono** (sin cola async en beta)
-- [ ] Endpoint de historial de cargas (sin revert en beta)
-- [ ] Endpoint de asignación docente-estudiante (desde el registro del estudiante, sin pantalla de asignación masiva)
-- [ ] Frontend: listado con filtros, formulario de estudiante (campos dinámicos desde catálogo), carga con preview y reporte de errores, historial de cargas
-- [ ] Tests: casos borde de validación CSV
+### Fase 3 — Estudiantes + Dataset (~2 semanas) — ✅ completa (2026-07-18)
+- [x] Schema Prisma: Student/TeacherStudent/DatasetColumnDefinition/DatasetUpload (adelantado en Fase 1) + seed de catálogo por defecto (`edad`, `sexo`, `promedio_general`, `materias_reprobadas`, `creditos_acumulados`, `adeudos` — referencia de `01-requerimientos.md` §6, a reemplazar en Fase 6 con el dataset real del ITM)
+- [x] CRUD de estudiantes + filtros (carrera/semestre/número de control/docente) — `StudentsModule`/`DatasetColumnsModule`, `validateExtraData` compartida (`src/common/validate-extra-data.ts`), `StudentScopeService` para `:all`/`:own` (docs/07-diseno-modulos-nestjs.md §5). Verificado manualmente end-to-end (crear con/sin errores de validación, filtros, asignar/quitar docente, scope `:own` con 404 fuera de alcance) — 2026-07-15.
+- [x] Endpoint de carga: parseo CSV/XLSX (`parsers/csv.parser.ts`, `parsers/xlsx.parser.ts`), validación de columnas núcleo + `extraData` contra catálogo activo, commit atómico **síncrono** dentro de `prisma.$transaction` (todo o nada). `DatasetUploadsModule`. Se agregaron campos a `DatasetUpload` que faltaban en el schema original (`createdCount`, `updatedCount`, `errors` — migración `20260717165745_add_dataset_upload_result_fields`) para poder cumplir la respuesta que ya prometía `06-diseno-api-rest.md` §5.6. Verificado manualmente end-to-end (CSV válido crea, mismo CSV re-subido actualiza, CSV con errores no aplica nada y responde 422 con `{row,field,issue}` exacto, XLSX real generado con SheetJS, tipo de archivo no soportado → 400) — 2026-07-17.
+- [x] Endpoint de historial de cargas (`GET /dataset-uploads`, `GET /dataset-uploads/:id` con reporte de errores si `status=failed`, sin revert en beta) — incluido en `DatasetUploadsModule`
+- [x] Endpoint de asignación docente-estudiante (`POST/DELETE /students/:id/teachers`, incluido en `StudentsModule`)
+- [x] Frontend: listado con filtros (`student-table.tsx`), formulario de estudiante con campos dinámicos desde catálogo (`student-form.tsx`, `dynamic-field.tsx`), carga con preview y reporte de errores fila/columna (`dataset-uploads/new`), historial de cargas (`dataset-uploads`, `dataset-uploads/[id]`) — typecheck y lint limpios en `apps/web`; falta verificación manual end-to-end en navegador
+- [x] Tests: `validateExtraData` (tipo incorrecto, campo requerido faltante, coerción) + `StudentScopeService` (`:all` vs `:own`) + `validateCoreFields` (núcleo faltante/inválido) + parser de CSV (BOM, trim, numeración de fila) — 24/24 pasan en total
 
 ### Fase 4 — Integración de predicciones (~1.5 semanas)
 - [x] Lado Pydantic del contrato `/predict` (`apps/ml/app/models.py`, adelantado en Fase 1 junto con el mock) — falta el DTO espejo en NestJS, que se escribe junto con el endpoint `POST /predictions`
@@ -129,6 +132,8 @@ Referencia: [01-requerimientos.md](01-requerimientos.md) · [03-arquitectura.md]
 - Sin borrado físico de usuarios/estudiantes en v1 — todo por `is_active`/`status`.
 - Recomendaciones generadas por reglas propias en el API, no por el modelo de ML.
 - `TeacherStudent` sin distinción por materia en beta (una sola asignación por par docente-estudiante).
+- Encabezados núcleo esperados en CSV/XLSX de carga masiva: `numero_control`, `nombre`, `carrera`, `semestre` (snake_case sin acentos, igual que las claves del catálogo `extraData`) — ninguna fuente lo especifica todavía porque no existe el dataset real del ITM; ajustar en `apps/api/src/dataset-uploads/validate-core-fields.ts` (`CORE_FIELD`) cuando se defina el formato real.
+- Límite de filas por carga (`dataset_upload_row_limit` en `SystemConfig`, default 2000) y tamaño máximo de archivo (5 MB, hardcoded en `DatasetUploadsService`) — el CRUD completo de `/system-config` (§5.10 de `06-diseno-api-rest.md`) no está implementado todavía, solo se lee esta clave directo por Prisma.
 
 ## 7. Hallazgos de la revisión crítica (2026-07-10) — no resueltos en docs/01-04 todavía
 
