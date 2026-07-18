@@ -102,14 +102,17 @@ model DatasetColumnDefinition {
 }
 
 model DatasetUpload {
-  id         String   @id @default(uuid())
-  fileName   String
-  uploadedBy String
-  uploader   User     @relation(fields: [uploadedBy], references: [id])
-  status     String // "processing" | "completed" | "failed"
-  totalRows  Int      @default(0)
-  errorRows  Int      @default(0)
-  createdAt  DateTime @default(now())
+  id           String   @id @default(uuid())
+  fileName     String
+  uploadedBy   String
+  uploader     User     @relation(fields: [uploadedBy], references: [id])
+  status       String // "processing" | "completed" | "failed"
+  totalRows    Int      @default(0)
+  errorRows    Int      @default(0)
+  createdCount Int      @default(0)
+  updatedCount Int      @default(0)
+  errors       Json     @default("[]") // [{ row, field, issue }] — solo poblado si status = "failed"
+  createdAt    DateTime @default(now())
 
   students Student[]
 }

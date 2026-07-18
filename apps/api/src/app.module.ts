@@ -10,8 +10,11 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { validateEnv } from './config/env.validation';
+import { DatasetColumnsModule } from './dataset-columns/dataset-columns.module';
+import { DatasetUploadsModule } from './dataset-uploads/dataset-uploads.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RolesModule } from './roles/roles.module';
+import { StudentsModule } from './students/students.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -23,6 +26,9 @@ import { UsersModule } from './users/users.module';
     RolesModule,
     UsersModule,
     AuthModule,
+    DatasetColumnsModule,
+    StudentsModule,
+    DatasetUploadsModule,
   ],
   controllers: [AppController],
   providers: [

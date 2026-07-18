@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "DatasetUpload" ADD COLUMN     "createdCount" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "errors" JSONB NOT NULL DEFAULT '[]',
+ADD COLUMN     "updatedCount" INTEGER NOT NULL DEFAULT 0;

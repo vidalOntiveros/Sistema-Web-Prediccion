@@ -5,6 +5,7 @@ import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as argon2 from 'argon2';
 import { generateTemporaryPassword } from '../src/common/generate-temporary-password';
+import type { Prisma } from '../src/generated/prisma/client';
 import { PrismaClient } from '../src/generated/prisma/client';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
@@ -91,6 +92,66 @@ async function seedRoles() {
   }
 }
 
+const DATASET_COLUMNS: {
+  key: string;
+  label: string;
+  dataType: 'string' | 'number' | 'boolean' | 'date';
+  required: boolean;
+  displayOrder: number;
+}[] = [
+  { key: 'edad', label: 'Edad', dataType: 'number', required: false, displayOrder: 1 },
+  { key: 'sexo', label: 'Sexo', dataType: 'string', required: false, displayOrder: 2 },
+  {
+    key: 'promedio_general',
+    label: 'Promedio general',
+    dataType: 'number',
+    required: true,
+    displayOrder: 3,
+  },
+  {
+    key: 'materias_reprobadas',
+    label: 'Materias reprobadas',
+    dataType: 'number',
+    required: true,
+    displayOrder: 4,
+  },
+  {
+    key: 'creditos_acumulados',
+    label: 'Créditos acumulados',
+    dataType: 'number',
+    required: false,
+    displayOrder: 5,
+  },
+  { key: 'adeudos', label: 'Adeudos', dataType: 'boolean', required: false, displayOrder: 6 },
+];
+
+async function seedDatasetColumns() {
+  console.log('Seeding catálogo de columnas de dataset (referencia, 01-requerimientos.md §6)...');
+  for (const column of DATASET_COLUMNS) {
+    await prisma.datasetColumnDefinition.upsert({
+      where: { key: column.key },
+      update: column,
+      create: column,
+    });
+  }
+}
+
+const SYSTEM_CONFIG: { key: string; value: Prisma.InputJsonValue }[] = [
+  // Leído directo por DatasetUploadsService — el CRUD de /system-config (§5.10) es v2/pendiente.
+  { key: 'dataset_upload_row_limit', value: 2000 },
+];
+
+async function seedSystemConfig() {
+  console.log('Seeding configuración del sistema...');
+  for (const config of SYSTEM_CONFIG) {
+    await prisma.systemConfig.upsert({
+      where: { key: config.key },
+      update: {},
+      create: config,
+    });
+  }
+}
+
 async function seedAdminUser() {
   const adminRole = await prisma.role.findUniqueOrThrow({ where: { name: 'Administrador' } });
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@itmazatlan.edu.mx';
@@ -120,6 +181,8 @@ async function seedAdminUser() {
 async function main() {
   await seedPermissions();
   await seedRoles();
+  await seedDatasetColumns();
+  await seedSystemConfig();
   await seedAdminUser();
 }
 
