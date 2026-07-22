@@ -12,6 +12,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
 import { validateEnv } from './config/env.validation';
 import { DatasetColumnsModule } from './dataset-columns/dataset-columns.module';
 import { DatasetUploadsModule } from './dataset-uploads/dataset-uploads.module';
+import { PredictionsModule } from './predictions/predictions.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RolesModule } from './roles/roles.module';
 import { StudentsModule } from './students/students.module';
@@ -29,6 +30,7 @@ import { UsersModule } from './users/users.module';
     DatasetColumnsModule,
     StudentsModule,
     DatasetUploadsModule,
+    PredictionsModule,
   ],
   controllers: [AppController],
   providers: [

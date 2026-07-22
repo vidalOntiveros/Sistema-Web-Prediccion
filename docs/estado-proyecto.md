@@ -6,7 +6,7 @@ Referencia: [01-requerimientos.md](01-requerimientos.md) · [03-arquitectura.md]
 
 ## 1. Fecha de referencia
 
-- Hoy: **2026-07-18**.
+- Hoy: **2026-07-22**.
 - Fecha objetivo de beta: **primera semana de agosto de 2026 (supuesto — confirmar fecha real de inicio de residencias formales)**.
 - Fecha límite institucional (v1 completo): diciembre de 2026.
 
@@ -27,6 +27,8 @@ Referencia: [01-requerimientos.md](01-requerimientos.md) · [03-arquitectura.md]
 | [13-estrategia-docker.md](13-estrategia-docker.md) | Dockerfiles, compose base vs. override, puertos expuestos |
 
 **Fase 1 — Setup e infraestructura:** ✅ completa (2026-07-15) — checkpoint de Docker y primera migración contra Postgres real verificados.
+**Fase 3 — Estudiantes + Dataset:** ✅ completa (2026-07-18).
+**Fase 4 — Integración de predicciones:** ✅ completa (2026-07-22) — backend + frontend verificados end-to-end en navegador (login → crear estudiante → ejecutar predicción → historial → detalle).
 
 ## 3. Roadmap de beta (orden de ejecución)
 
@@ -77,14 +79,17 @@ Referencia: [01-requerimientos.md](01-requerimientos.md) · [03-arquitectura.md]
 - [x] Frontend: listado con filtros (`student-table.tsx`), formulario de estudiante con campos dinámicos desde catálogo (`student-form.tsx`, `dynamic-field.tsx`), carga con preview y reporte de errores fila/columna (`dataset-uploads/new`), historial de cargas (`dataset-uploads`, `dataset-uploads/[id]`) — typecheck y lint limpios en `apps/web`; falta verificación manual end-to-end en navegador
 - [x] Tests: `validateExtraData` (tipo incorrecto, campo requerido faltante, coerción) + `StudentScopeService` (`:all` vs `:own`) + `validateCoreFields` (núcleo faltante/inválido) + parser de CSV (BOM, trim, numeración de fila) — 24/24 pasan en total
 
-### Fase 4 — Integración de predicciones (~1.5 semanas)
-- [x] Lado Pydantic del contrato `/predict` (`apps/ml/app/models.py`, adelantado en Fase 1 junto con el mock) — falta el DTO espejo en NestJS, que se escribe junto con el endpoint `POST /predictions`
-- [ ] `buildPredictionPayload(student)` como módulo aislado
-- [ ] Endpoint `POST /predictions` → llama ML → persiste `Prediction`
-- [ ] Tabla de reglas de recomendaciones en API, indexadas por `riskLevel` ([ADR-0002](adr/0002-recomendaciones-generadas-en-api.md))
-- [ ] Endpoint de historial de predicciones con filtros
-- [ ] Frontend: acción "ejecutar predicción" en detalle de estudiante (individual, no por lote), vista de resultado + recomendaciones, historial
-- [ ] Tests: flujo de predicción con mock, scoping por docente (solo asignados)
+### Fase 4 — Integración de predicciones (~1.5 semanas) — ✅ completa (2026-07-22)
+- [x] Lado Pydantic del contrato `/predict` (`apps/ml/app/models.py`, adelantado en Fase 1 junto con el mock)
+- [x] `buildPredictionPayload(student)` como módulo aislado (`apps/api/src/predictions/build-prediction-payload.ts`) — mapa genérico `career`/`semester` + `extraData` completo, sin depender de qué columnas exista hoy el catálogo
+- [x] `MlClientService` (`apps/api/src/predictions/ml-client.service.ts`) — `fetch` nativo de Node (sin dependencia nueva tipo `@nestjs/axios`), timeout de 8s vía `AbortController`, mapea 422→`INSUFFICIENT_STUDENT_DATA` y caída/timeout→`502 ML_SERVICE_UNAVAILABLE`
+- [x] Endpoint `POST /predictions` → llama ML → calcula `riskLevel` si falta (umbral en `SystemConfig`, clave `prediction_risk_thresholds`, default `{medium:0.4,high:0.7}`, seed agregado) → persiste `Prediction`
+- [x] Tabla de reglas de recomendaciones en API, indexadas por `riskLevel` (`apps/api/src/predictions/recommendation-rules.ts`, [ADR-0002](adr/0002-recomendaciones-generadas-en-api.md))
+- [x] Endpoint de historial de predicciones con filtros (`GET /predictions` — `studentId`/`career`/`riskLevel`/`dateFrom`/`dateTo`, `GET /predictions/:id`), scoping `:all`/`:own` reutilizando `StudentScopeService` (ya exportado desde `StudentsModule`) tal como preveía `07-diseno-modulos-nestjs.md` §5
+- [x] Frontend: acción "ejecutar predicción" en detalle de estudiante (`RunPredictionButton`), vista de resultado + recomendaciones (`PredictionResultCard`, reutilizada en detalle de estudiante y en `/predictions/:id`), historial con filtros (`/predictions`, `PredictionTable`) — link "Ver historial" desde el estudiante, link "Predicciones" en la nav
+- [x] Tests unitarios: `buildPredictionPayload` (4), `MlClientService` (5, con `fetch` mockeado), `PredictionsService` (4, con Prisma/scope/ML mockeados) — 13/13 pasan, 37/37 en total del proyecto
+- [x] Checkpoint manual end-to-end en navegador (2026-07-22): Docker (Postgres) + `api`/`ml` nativos + `web` nativo, login como Admin → crear estudiante con datos de riesgo → "Ejecutar predicción" → resultado con `riskLevel=high`, factores y recomendaciones → historial (`/predictions?studentId=...`) → detalle de predicción. Sin errores de consola relevantes (el único `401` es el chequeo de sesión esperado antes de login).
+- [ ] Tests de integración e2e automatizados (`test/*.e2e-spec.ts` contra Postgres) — mismo bloqueo que Fase 1/2, pendiente de automatizar lo ya verificado manualmente
 
 ### Fase 5 — Dashboard y cierre de beta (~1 semana)
 - [ ] Endpoint de dashboard: conteos agregados (sin series de tiempo)

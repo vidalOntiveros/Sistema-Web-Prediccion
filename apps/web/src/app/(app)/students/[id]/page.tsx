@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,7 @@ import {
 import { Can } from '@/components/shared/can';
 import { ErrorState } from '@/components/shared/error-state';
 import { RiskBadge } from '@/components/predictions/risk-badge';
+import { RunPredictionButton } from '@/components/predictions/run-prediction-button';
 import { StudentForm } from '@/components/students/student-form';
 import { useStudent } from '@/hooks/use-students';
 import { useAddTeachers, useRemoveTeacher } from '@/hooks/use-student-mutations';
@@ -70,6 +72,23 @@ export default function StudentDetailPage() {
           {student.status === 'active' ? 'Activo' : 'Inactivo'}
         </Badge>
         {student.latestPrediction && <RiskBadge riskLevel={student.latestPrediction.riskLevel} />}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-muted-foreground">Predicciones</h2>
+          <Can permission={['predictions:read:all', 'predictions:read:own']}>
+            <Link
+              href={`/predictions?studentId=${student.id}`}
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Ver historial
+            </Link>
+          </Can>
+        </div>
+        <Can permission={['predictions:run:all', 'predictions:run:own']}>
+          <RunPredictionButton studentId={student.id} />
+        </Can>
       </div>
 
       {Object.keys(student.extraData).length > 0 && (

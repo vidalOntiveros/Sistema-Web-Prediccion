@@ -28,6 +28,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <Can permission="datasets:read">
             <Link href="/dataset-uploads">Cargas</Link>
           </Can>
+          <Can permission={['predictions:read:all', 'predictions:read:own']}>
+            <Link href="/predictions">Predicciones</Link>
+          </Can>
         </nav>
         <div className="flex items-center gap-3">
           <span className="font-medium">{user?.fullName}</span>

@@ -139,6 +139,9 @@ async function seedDatasetColumns() {
 const SYSTEM_CONFIG: { key: string; value: Prisma.InputJsonValue }[] = [
   // Leído directo por DatasetUploadsService — el CRUD de /system-config (§5.10) es v2/pendiente.
   { key: 'dataset_upload_row_limit', value: 2000 },
+  // Umbral usado por PredictionsService para calcular riskLevel cuando el
+  // servicio ML no lo manda (ADR-0001): score >= high => "high", >= medium => "medium", si no "low".
+  { key: 'prediction_risk_thresholds', value: { medium: 0.4, high: 0.7 } },
 ];
 
 async function seedSystemConfig() {

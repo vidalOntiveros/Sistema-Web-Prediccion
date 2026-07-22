@@ -9,6 +9,6 @@ import { StudentsService } from './students.service';
   imports: [AuditModule, DatasetColumnsModule],
   controllers: [StudentsController],
   providers: [StudentsService, StudentScopeService],
-  exports: [StudentsService],
+  exports: [StudentsService, StudentScopeService],
 })
 export class StudentsModule {}
